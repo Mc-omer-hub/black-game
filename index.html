@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- 手机横屏强制方案 -->
+<meta name="x5-orientation" content="landscape">
+<meta name="screen-orientation" content="landscape">
 <title>莱克快跑</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -149,6 +152,22 @@ canvas#gameCanvas { display: block; background: #fff; cursor: pointer; }
 }
 .btn-back:hover { background: rgba(255,255,255,0.15); color: #fff; transform: scale(1.1); }
 .btn-back.show { opacity: 1; pointer-events: all; }
+
+/* ========== 手机强制横屏 ========== */
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  body.landscape-force {
+    transform: rotate(-90deg);
+    transform-origin: left top;
+    width: 100vh; height: 100vw;
+    overflow: hidden; position: fixed; top: 0; left: 0;
+  }
+  body.landscape-force #menu,
+  body.landscape-force #gamePage,
+  body.landscape-force .btn-back {
+    width: 100vh; height: 100vw;
+    transform-origin: left top;
+  }
+}
 
 /* ========== 触屏按钮（全平台） ========== */
 .touch-controls {
@@ -2138,27 +2157,35 @@ initJoystick();
 
 // 窗口适配
 function isMobile(){return 'ontouchstart' in window||navigator.maxTouchPoints>0;}
+let _landscapeMode = false;
+
+function applyLandscape(){
+  // 手机竖屏 → CSS旋转成横屏
+  const portrait = window.innerHeight > window.innerWidth;
+  if(isMobile() && portrait && !_landscapeMode){
+    document.body.classList.add('landscape-force');
+    _landscapeMode = true;
+  } else if(!portrait && _landscapeMode){
+    document.body.classList.remove('landscape-force');
+    _landscapeMode = false;
+  }
+}
 
 function fitG(){
+  applyLandscape();
   const gi=document.querySelector('.game-inner');
   if(!gi)return;
-  // 全屏铺满
-  const sc = Math.max(Math.min(window.innerWidth/800, window.innerHeight/320));
+  // 横屏后用翻转后的宽高
+  const w = _landscapeMode ? window.innerHeight : window.innerWidth;
+  const h = _landscapeMode ? window.innerWidth : window.innerHeight;
+  const sc = Math.max(Math.min(w/800, h/320));
   gi.style.transform=`scale(${sc})`;
   gi.style.transformOrigin='top left';
   gi.style.position='absolute';
-  gi.style.left=`${(window.innerWidth-800*sc)/2}px`;
-  gi.style.top=`${(window.innerHeight-320*sc)/2}px`;
+  gi.style.left=`${(w-800*sc)/2}px`;
+  gi.style.top=`${(h-320*sc)/2}px`;
 }
 
-// 手机强制横屏
-if(isMobile()){
-  try{
-    if(screen.orientation && screen.orientation.lock){
-      screen.orientation.lock('landscape').catch(()=>{});
-    }
-  }catch(e){}
-}
 window.addEventListener('resize',fitG);
 fitG();
 console.log('🏃 莱克快跑 v2 — 殖民者追兵+棉花丛+冲刺技能!');
