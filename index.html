@@ -154,22 +154,28 @@ canvas#gameCanvas { display: block; background: #fff; cursor: pointer; }
 html.landscape-force {
   overflow: hidden; position: fixed; width: 100%; height: 100%;
 }
+html.landscape-force, html.landscape-force body {
+  margin: 0; padding: 0;
+}
 html.landscape-force body {
   width: 100vh; height: 100vw;
   transform: rotate(-90deg);
   transform-origin: left top;
   position: absolute;
-  top: 100vw;
+  top: 100vh;
   left: 0;
   overflow: hidden;
 }
+/* fixed元素不跟随CSS旋转，改为absolute */
 html.landscape-force body #menu,
 html.landscape-force body #gamePage,
 html.landscape-force body .btn-back,
-html.landscape-force body .shop-overlay {
-  width: 100vh;
-  height: 100vw;
+html.landscape-force body #bgCanvas,
+html.landscape-force body .shop-overlay,
+html.landscape-force body .result-overlay {
+  position: absolute !important;
 }
+
 
 /* ========== 触屏按钮（全平台） ========== */
 .touch-controls {
@@ -664,7 +670,7 @@ document.querySelectorAll('.mode-card').forEach(card=>{
 });
 
 document.getElementById('startBtn').addEventListener('click',()=>{
-  tryLockLandscape();
+  tryLock();
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('gamePage').classList.add('active');
   document.getElementById('backBtn').classList.add('show');
@@ -2123,12 +2129,11 @@ let jTouchId = null, jMouseDown = false;
 const jRadius = 28;
 
 function jSetPos(clientX, clientY){
-  const f = fixXY(clientX, clientY);
   const rect = jBase.getBoundingClientRect();
   const cx = rect.left + rect.width/2;
   const cy = rect.top + rect.height/2;
-  let dx = f.x - cx;
-  let dy = f.y - cy;
+  let dx = clientX - cx;
+  let dy = clientY - cy;
   const dist = Math.sqrt(dx*dx + dy*dy);
   if(dist > jRadius){ dx = dx/dist*jRadius; dy = dy/dist*jRadius; }
   jKnob.style.transform = `translate(${-50 + dx/jRadius*50}%, ${-50 + dy/jRadius*50}%)`;
@@ -2159,33 +2164,23 @@ function initJoystick(){
 
 initJoystick();
 
-// ============ 强制横屏系统（CSS旋转+坐标映射） ============
-let _landscapeRotated = false; // 是否处于旋转状态
+// ============ 强制横屏系统（CSS旋转） ============
+let _landscapeRotated = false;
 
 function isMobile(){return 'ontouchstart' in window||navigator.maxTouchPoints>0;}
 
-// 坐标转换：旋转后的物理坐标 → 逻辑坐标
-function fixXY(clientX, clientY){
-  if(!_landscapeRotated) return {x:clientX, y:clientY};
-  // body rotate(-90deg) 时：
-  // 物理 (cx, cy) → 逻辑坐标
-  return {
-    x: clientY,                              // 物理Y → 逻辑X
-    y: window.innerWidth - clientX             // 物理X → 逻辑Y（反转）
-  };
-}
-
-// 强制横屏核心（任何环境，竖屏即旋转）
 function forceLandscape(){
-  const isPortrait = window.innerHeight > window.innerWidth;
+  if(!isMobile()) return;
+  const portrait = window.innerHeight > window.innerWidth;
   const html = document.documentElement;
-  if(isPortrait && !_landscapeRotated){
+  if(portrait && !_landscapeRotated){
     html.classList.add('landscape-force');
     _landscapeRotated = true;
-    // 尝试全屏+锁横屏
-    try{ if(html.requestFullscreen) html.requestFullscreen().catch(()=>{}); }catch(e){}
-    try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{}); }catch(e){}
-  } else if(!isPortrait && _landscapeRotated){
+    // 尝试 API 锁屏（可能失败，CSS旋转兜底）
+    try{ if(html.requestFullscreen) html.requestFullscreen().catch(()=>{}); }catch(e0){}
+    try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{}); }catch(e1){}
+    console.log('📱 已启用CSS强制横屏');
+  } else if(!portrait && _landscapeRotated){
     html.classList.remove('landscape-force');
     _landscapeRotated = false;
   }
@@ -2195,9 +2190,10 @@ function forceLandscape(){
 function fitG(){
   const gi=document.querySelector('.game-inner');
   if(!gi)return;
-  // 旋转后：用对调后的宽高计算缩放
-  const w = _landscapeRotated ? window.innerHeight : window.innerWidth;
-  const h = _landscapeRotated ? window.innerWidth : window.innerHeight;
+  const wRaw=window.innerWidth, hRaw=window.innerHeight;
+  // 旋转CSS生效后，body内部的元素用对调的宽高
+  const w = _landscapeRotated ? window.innerHeight : wRaw;
+  const h = _landscapeRotated ? window.innerWidth : hRaw;
   const sc = Math.max(Math.min(w/800, h/320));
   gi.style.transform=`scale(${sc})`;
   gi.style.transformOrigin='top left';
@@ -2206,13 +2202,12 @@ function fitG(){
   gi.style.top=`${(h-320*sc)/2}px`;
 }
 
-// 事件 + 窗口变化
 window.addEventListener('resize', forceLandscape);
 window.addEventListener('orientationchange', ()=>setTimeout(forceLandscape, 400));
-// 页面加载时立即执行，用户首次点击也尝试锁屏
 window.addEventListener('load', forceLandscape);
-document.addEventListener('touchstart', ()=>{tryLock();}, {once:true});
-document.addEventListener('click', ()=>{tryLock();}, {once:true});
+// 用户首次点击尝试API锁屏
+document.addEventListener('touchstart', function once(){ tryLock(); document.removeEventListener('touchstart',once); });
+document.addEventListener('click', function once2(){ tryLock(); document.removeEventListener('click',once2); });
 fitG();
 
 function tryLock(){
