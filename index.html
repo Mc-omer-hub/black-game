@@ -150,6 +150,23 @@ canvas#gameCanvas { display: block; background: #fff; cursor: pointer; }
 .btn-back:hover { background: rgba(255,255,255,0.15); color: #fff; transform: scale(1.1); }
 .btn-back.show { opacity: 1; pointer-events: all; }
 
+/* ========== 横屏提示 ========== */
+.rotate-hint {
+  position: fixed; inset: 0; z-index: 999;
+  display: none; flex-direction: column;
+  justify-content: center; align-items: center;
+  background: linear-gradient(135deg, #0f0c29, #302b63);
+  color: #fff;
+}
+.rotate-hint.show { display: flex; }
+.rotate-icon { font-size: 64px; margin-bottom: 16px; animation: rotatePhone 2s ease-in-out infinite; }
+@keyframes rotatePhone {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+.rotate-text { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+.rotate-sub { font-size: 14px; color: rgba(255,255,255,0.4); }
+
 /* ========== 触屏按钮（全平台） ========== */
 .touch-controls {
   position: absolute; inset: 0; z-index: 10;
@@ -428,6 +445,13 @@ canvas#gameCanvas { display: block; background: #fff; cursor: pointer; }
 <body>
 
 <canvas id="bgCanvas"></canvas>
+
+<!-- 横屏提示 -->
+<div class="rotate-hint" id="rotateHint">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-text">请将手机横屏</div>
+  <div class="rotate-sub">翻转手机以获得最佳体验</div>
+</div>
 
 <div id="menu">
   <div class="floating-images" id="floatContainer">
@@ -2137,18 +2161,36 @@ function initJoystick(){
 initJoystick();
 
 // 窗口适配
+function isMobile(){return 'ontouchstart' in window||navigator.maxTouchPoints>0;}
+function isLandscape(){return window.innerWidth>window.innerHeight;}
+
 function fitG(){
   const gi=document.querySelector('.game-inner');
-  const pad = 12;
-  const sc = Math.min((window.innerWidth-pad*2)/800, (window.innerHeight-pad*2)/320);
+  if(!gi)return;
+  // 手机横屏/PC 全屏铺满，不留padding
+  const pad = isMobile() ? 0 : 12;
+  const sc = Math.max(Math.min((window.innerWidth-pad*2)/800, (window.innerHeight-pad*2)/320));
   gi.style.transform=`scale(${sc})`;
   gi.style.transformOrigin='top left';
   gi.style.position='absolute';
   gi.style.left=`${(window.innerWidth-800*sc)/2}px`;
   gi.style.top=`${(window.innerHeight-320*sc)/2}px`;
 }
-window.addEventListener('resize',fitG);
-fitG(); // 初始调用
+
+// 横屏检测
+function checkOrientation(){
+  const hint=document.getElementById('rotateHint');
+  if(isMobile() && !isLandscape()){
+    hint.classList.add('show');
+  } else {
+    hint.classList.remove('show');
+  }
+  fitG();
+}
+window.addEventListener('resize',checkOrientation);
+window.addEventListener('orientationchange',()=>setTimeout(checkOrientation,300));
+checkOrientation();
+fitG();
 console.log('🏃 莱克快跑 v2 — 殖民者追兵+棉花丛+冲刺技能!');
 </script>
 </body>
