@@ -3,9 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- 手机横屏强制方案 -->
-<meta name="x5-orientation" content="landscape">
-<meta name="screen-orientation" content="landscape">
 <title>莱克快跑</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -153,21 +150,18 @@ canvas#gameCanvas { display: block; background: #fff; cursor: pointer; }
 .btn-back:hover { background: rgba(255,255,255,0.15); color: #fff; transform: scale(1.1); }
 .btn-back.show { opacity: 1; pointer-events: all; }
 
-/* ========== 手机强制横屏 ========== */
-@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
-  body.landscape-force {
-    transform: rotate(-90deg);
-    transform-origin: left top;
-    width: 100vh; height: 100vw;
-    overflow: hidden; position: fixed; top: 0; left: 0;
-  }
-  body.landscape-force #menu,
-  body.landscape-force #gamePage,
-  body.landscape-force .btn-back {
-    width: 100vh; height: 100vw;
-    transform-origin: left top;
-  }
+/* ========== 竖屏提示 ========== */
+.portrait-hint {
+  position: fixed; inset: 0; z-index: 999;
+  display: none; flex-direction: column;
+  justify-content: center; align-items: center;
+  background: #0f0c29;
+  color: #fff;
 }
+.portrait-hint.show { display: flex; }
+.portrait-icon { font-size: 60px; margin-bottom: 12px; }
+.portrait-text { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.portrait-sub { font-size: 14px; color: rgba(255,255,255,0.4); }
 
 /* ========== 触屏按钮（全平台） ========== */
 .touch-controls {
@@ -448,6 +442,13 @@ canvas#gameCanvas { display: block; background: #fff; cursor: pointer; }
 
 <canvas id="bgCanvas"></canvas>
 
+<!-- 竖屏提示 -->
+<div class="portrait-hint" id="portraitHint">
+  <div class="portrait-icon">📱</div>
+  <div class="portrait-text">请将手机横屏放置</div>
+  <div class="portrait-sub">横屏体验更佳</div>
+</div>
+
 <div id="menu">
   <div class="floating-images" id="floatContainer">
     <img class="float-img" src="a.jpg" alt=""><img class="float-img" src="b.png" alt="">
@@ -662,6 +663,7 @@ document.querySelectorAll('.mode-card').forEach(card=>{
 });
 
 document.getElementById('startBtn').addEventListener('click',()=>{
+  tryLockLandscape();
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('gamePage').classList.add('active');
   document.getElementById('backBtn').classList.add('show');
@@ -2155,29 +2157,25 @@ function initJoystick(){
 
 initJoystick();
 
-// 窗口适配
+// 窗口适配 + 横屏提示
 function isMobile(){return 'ontouchstart' in window||navigator.maxTouchPoints>0;}
-let _landscapeMode = false;
 
-function applyLandscape(){
-  // 手机竖屏 → CSS旋转成横屏
-  const portrait = window.innerHeight > window.innerWidth;
-  if(isMobile() && portrait && !_landscapeMode){
-    document.body.classList.add('landscape-force');
-    _landscapeMode = true;
-  } else if(!portrait && _landscapeMode){
-    document.body.classList.remove('landscape-force');
-    _landscapeMode = false;
-  }
+// 手机横屏锁定
+function tryLockLandscape(){
+  if(!isMobile())return;
+  const el = document.documentElement;
+  if(el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+  else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  try{
+    if(screen.orientation && screen.orientation.lock)
+      screen.orientation.lock('landscape').catch(()=>{});
+  }catch(e){}
 }
 
 function fitG(){
-  applyLandscape();
   const gi=document.querySelector('.game-inner');
   if(!gi)return;
-  // 横屏后用翻转后的宽高
-  const w = _landscapeMode ? window.innerHeight : window.innerWidth;
-  const h = _landscapeMode ? window.innerWidth : window.innerHeight;
+  const w=window.innerWidth, h=window.innerHeight;
   const sc = Math.max(Math.min(w/800, h/320));
   gi.style.transform=`scale(${sc})`;
   gi.style.transformOrigin='top left';
@@ -2186,7 +2184,25 @@ function fitG(){
   gi.style.top=`${(h-320*sc)/2}px`;
 }
 
-window.addEventListener('resize',fitG);
+// 竖屏检测 + 提示
+function checkOrientation(){
+  const hint=document.getElementById('portraitHint');
+  const isPortrait = window.innerHeight > window.innerWidth;
+  if(isMobile() && isPortrait){
+    hint.classList.add('show');
+  } else {
+    hint.classList.remove('show');
+  }
+  fitG();
+}
+
+if(isMobile()){
+  document.addEventListener('touchstart', ()=>{tryLockLandscape();}, {once:true});
+  document.addEventListener('click', ()=>{tryLockLandscape();}, {once:true});
+}
+window.addEventListener('resize',checkOrientation);
+window.addEventListener('orientationchange',()=>setTimeout(checkOrientation,500));
+checkOrientation();
 fitG();
 console.log('🏃 莱克快跑 v2 — 殖民者追兵+棉花丛+冲刺技能!');
 </script>
